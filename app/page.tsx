@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function Home() {
   const src = "/sounds/kintsugi.mp3";
 
-  const audioContext = useMemo(() => new AudioContext(), []);
-
+  const audioContextRef = useRef<AudioContext | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const pannerNodeRef = useRef<StereoPannerNode | null>(null);
@@ -15,7 +14,15 @@ export default function Home() {
   const [pan, setPan] = useState<number>(0);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     if (!audioRef.current) return;
+
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+    }
+
+    const audioContext = audioContextRef.current;
 
     if (!gainNodeRef.current) {
       gainNodeRef.current = audioContext.createGain();
@@ -39,16 +46,16 @@ export default function Home() {
     return () => {
       track.disconnect();
     };
-  }, [audioContext, gain, pan]);
+  }, [audioContextRef, gain, pan]);
 
   const handleGainChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
 
     setGain(value);
 
-    if (!gainNodeRef.current) return;
+    if (!gainNodeRef.current || !audioContextRef.current) return;
 
-    gainNodeRef.current.gain.setValueAtTime(value, audioContext.currentTime);
+    gainNodeRef.current.gain.setValueAtTime(value, audioContextRef.current.currentTime);
   };
 
   const handlePanChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,16 +63,16 @@ export default function Home() {
 
     setPan(value);
 
-    if (!pannerNodeRef.current) return;
+    if (!pannerNodeRef.current || !audioContextRef.current) return;
 
-    pannerNodeRef.current.pan.setValueAtTime(value, audioContext.currentTime);
+    pannerNodeRef.current.pan.setValueAtTime(value, audioContextRef.current.currentTime);
   };
 
   const togglePlay = async () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || !audioContextRef.current) return;
 
-    if (audioContext.state === "suspended") {
-      await audioContext.resume();
+    if (audioContextRef.current.state === "suspended") {
+      await audioContextRef.current.resume();
     }
 
     if (audioRef.current.paused) {
@@ -76,35 +83,36 @@ export default function Home() {
   };
 
   return (
-    <div>
+    <main>
       <h1>Web Audio API</h1>
 
-      <audio ref={audioRef} src={src} />
+      <section className="flex">
+        <audio ref={audioRef} src={src} />
+        <label>
+          Gain: {gain.toFixed(2)}
+          <input
+            type="range"
+            min={0}
+            max={2}
+            step={0.01}
+            value={gain}
+            onChange={handleGainChange}
+          />
+        </label>
+        <label>
+          Pan: {pan.toFixed(2)}
+          <input
+            type="range"
+            min={-1}
+            max={1}
+            value={pan}
+            step={0.01}
+            onChange={handlePanChange}
+          />
+        </label>
 
-      <label>
-        Gain: {gain.toFixed(2)}
-        <input
-          type="range"
-          min={0}
-          max={2}
-          step={0.01}
-          value={gain}
-          onChange={handleGainChange}
-        />
-      </label>
-      <label>
-        Pan: {pan.toFixed(2)}
-        <input
-          type="range"
-          min={-1}
-          max={1}
-          value={pan}
-          step={0.01}
-          onChange={handlePanChange}
-        />
-      </label>
-
-      <button onClick={togglePlay}>Play / Pause</button>
-    </div>
+        <button onClick={togglePlay}>Play / Pause</button>
+      </section>
+    </main>
   );
 }
