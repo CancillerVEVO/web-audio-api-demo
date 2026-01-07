@@ -1,7 +1,8 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { WAVE_TABLE } from "./components/wavetable";
 import Pad from "./components/Pad";
+import ControlKnob from "./components/control-knob";
 
 const SWEEP_LENGTH = 2;
 const LOOKAHEAD = 25.0;
@@ -17,76 +18,11 @@ export default function Page() {
   const [sweepBar, setSweepBar] = useState<boolean[]>(EMPTY_BAR);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
 
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const waveRef = useRef<PeriodicWave | null>(null);
-  const tempoRef = useRef(tempo);
-  const currentNoteRef = useRef(0);
-  const nextNoteTimeRef = useRef(0);
-  const timerIDRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const attackRef = useRef(attackTime);
-  const releaseRef = useRef(releaseTime);
-  const frequencyRef = useRef(frequency);
-
-  const playSweep = (time: number): void => {
-    const audioCtx = audioContextRef.current;
-    const wave = waveRef.current;
-
-    if (!audioCtx || !wave) return;
-
-    const osc = new OscillatorNode(audioCtx, {
-      frequency: frequencyRef.current,
-      type: "custom",
-      periodicWave: wave,
-    });
-
-    const sweepEnv = new GainNode(audioCtx);
-    sweepEnv.gain.cancelScheduledValues(time);
-    sweepEnv.gain.setValueAtTime(0, time);
-    sweepEnv.gain.linearRampToValueAtTime(1, time + attackRef.current);
-    sweepEnv.gain.linearRampToValueAtTime(
-      0,
-      time + SWEEP_LENGTH - releaseRef.current
-    );
-
-    osc.connect(sweepEnv).connect(audioCtx.destination);
-    osc.start(time);
-    osc.stop(time + SWEEP_LENGTH);
-  };
-
-  const nextNote = () => {
-    const secondsPerBeat = 60.0 / tempoRef.current;
-    nextNoteTimeRef.current += secondsPerBeat;
-    currentNoteRef.current = (currentNoteRef.current + 1) % 4;
-  };
-
-  const scheduleNote = (beatNumber: number, time: number) => {
-    if (sweepBar[beatNumber]) {
-      playSweep(time);
-    }
-  };
-
-  const scheduler = () => {
-    const audioCtx = audioContextRef.current;
-    if (!audioCtx) return;
-    // While there are notes that will need to play before the next interval,
-    // schedule them and advance the pointer
-
-    while (
-      nextNoteTimeRef.current <
-      audioCtx.currentTime + SCHEDULED_AHEAD_TIME
-    ) {
-      scheduleNote(currentNoteRef.current, nextNoteTimeRef.current);
-      nextNote();
-    }
-
-    timerIDRef.current = setTimeout(scheduler, LOOKAHEAD);
-  };
   // event handlers
   const handleAttackChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const value = parseFloat(e.target.value);
 
     setAttackTime(value);
-    attackRef.current = value;
   };
 
   const handleReleaseChange = (
@@ -95,14 +31,12 @@ export default function Page() {
     const value = parseFloat(e.target.value);
 
     setReleaseTime(value);
-    releaseRef.current = value;
   };
 
   const handleBPMChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const value = parseFloat(e.target.value);
 
     setTempo(value);
-    tempoRef.current = value;
   };
 
   const handleFrequencyChange = (
@@ -111,52 +45,108 @@ export default function Page() {
     const value = parseFloat(e.target.value);
 
     setFrequency(value);
-    frequencyRef.current = value;
   };
 
-  const handlePlayButtonClick = (): void => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext();
+  const handlePlayButtonClick = () => {
+    setIsPlaying((prev) => !prev);
+  };
+
+  useEffect(() => {
+    if (!isPlaying) {
+      return;
     }
 
-    const audioCtx = audioContextRef.current;
+    const audioCtx = new AudioContext();
+    const wave = audioCtx.createPeriodicWave(WAVE_TABLE.real, WAVE_TABLE.imag);
 
-    if (!waveRef.current) {
-      waveRef.current = audioCtx.createPeriodicWave(
-        WAVE_TABLE.real,
-        WAVE_TABLE.imag
+    let timerID: ReturnType<typeof setTimeout>;
+
+    let currentNote = 0;
+    let nextNoteTime = audioCtx.currentTime;
+
+    const playSweep = (time: number): void => {
+      const osc = new OscillatorNode(audioCtx, {
+        frequency: frequency,
+        type: "custom",
+        periodicWave: wave,
+      });
+
+      const sweepEnv = new GainNode(audioCtx);
+      sweepEnv.gain.cancelScheduledValues(time);
+      sweepEnv.gain.setValueAtTime(0, time);
+      sweepEnv.gain.linearRampToValueAtTime(1, time + attackTime);
+      sweepEnv.gain.linearRampToValueAtTime(
+        0,
+        time + SWEEP_LENGTH - releaseTime
       );
-    }
 
-    setIsPlaying((prev) => {
-      if (!prev) {
-        if (audioCtx.state === "suspended") {
-          audioCtx.resume();
-        }
+      osc.connect(sweepEnv).connect(audioCtx.destination);
+      osc.start(time);
+      osc.stop(time + SWEEP_LENGTH);
+    };
 
-        currentNoteRef.current = 0;
-        nextNoteTimeRef.current = audioCtx.currentTime;
+    const nextNote = () => {
+      const secondsPerBeat = 60.0 / tempo;
+      nextNoteTime += secondsPerBeat;
+      currentNote = (currentNote + 1) % 4;
+    };
 
-        if (!timerIDRef.current) {
-          scheduler();
-        }
-      } else {
-        if (timerIDRef.current) {
-          clearTimeout(timerIDRef.current);
-          timerIDRef.current = null;
-        }
+    const scheduleNote = (beatNumber: number, time: number) => {
+      if (sweepBar[beatNumber]) {
+        playSweep(time);
+      }
+    };
+
+    const scheduler = () => {
+      // While there are notes that will need to play before the next interval,
+      // schedule them and advance the pointer
+
+      while (nextNoteTime < audioCtx.currentTime + SCHEDULED_AHEAD_TIME) {
+        scheduleNote(currentNote, nextNoteTime);
+        nextNote();
       }
 
-      return !prev;
-    });
-  };
+      timerID = setTimeout(scheduler, LOOKAHEAD);
+    };
+
+    scheduler();
+
+    return () => {
+      if (timerID) {
+        clearTimeout(timerID);
+      }
+    };
+  }, [attackTime, frequency, isPlaying, releaseTime, sweepBar, tempo]);
 
   const playButtonLabel = isPlaying ? "STOP" : "START";
 
   return (
     <main>
       <h1 className="text-2xl font-bold">Example 2. Audio Sequencer</h1>
+
       <article>
+        {/**
+         * BPM
+         */}
+        <section>
+          <div>
+            <label htmlFor="bpm">BPM: {tempo}</label>
+            <input
+              name="bpm"
+              type="range"
+              min={60}
+              max={200}
+              step={1}
+              value={tempo}
+              onChange={handleBPMChange}
+            />
+          </div>
+        </section>
+
+        {/**Play Button */}
+        <div>
+          <button onClick={handlePlayButtonClick}>{playButtonLabel}</button>
+        </div>
         {/**
          * SWEEP CONTROLS
          */}
@@ -164,43 +154,31 @@ export default function Page() {
           <div className="flex space-x-5">
             <h3 className="text-2xl">Sweep Controls</h3>
             <div className="flex flex-col">
-              <label>
-                <p>Att</p>
-                <input
-                  name="attack"
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  value={attackTime}
-                  onChange={handleAttackChange}
-                  className="ml-3"
-                />
-              </label>
+              <ControlKnob
+                label="Att"
+                min={0}
+                max={1}
+                step={0.1}
+                value={attackTime}
+                onChange={handleAttackChange}
+              />
+              <ControlKnob
+                label="Rel"
+                min={0}
+                max={2}
+                step={0.1}
+                value={releaseTime}
+                onChange={handleReleaseChange}
+              />
 
-              <label className="m-1">
-                <p>Rel</p>
-                <input
-                  type="range"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  value={releaseTime}
-                  onChange={handleReleaseChange}
-                />
-              </label>
-
-              <label>
-                <p>Frq</p>
-                <input
-                  type="range"
-                  min={0}
-                  max={400}
-                  step={10}
-                  value={frequency}
-                  onChange={handleFrequencyChange}
-                />
-              </label>
+              <ControlKnob
+                label="Freq"
+                min={0}
+                max={400}
+                step={10}
+                value={frequency}
+                onChange={handleFrequencyChange}
+              />
             </div>
 
             <div className="flex">
@@ -251,34 +229,6 @@ export default function Page() {
             </div>
           </div>
         </section>
-
-        {/**
-         * BPM
-         */}
-        <section>
-          <div>
-            <label htmlFor="bpm">BPM: {tempo}</label>
-            <input
-              name="bpm"
-              type="range"
-              min={60}
-              max={200}
-              step={1}
-              value={tempo}
-              onChange={handleBPMChange}
-            />
-          </div>
-        </section>
-
-        {/**Play Button */}
-        <div>
-          <label className="bg-blue-500">
-            <p className={isPlaying ? "text-red-700" : "text-blue-700"}>
-              {playButtonLabel}
-            </p>
-            <input type="button" onClick={handlePlayButtonClick} />
-          </label>
-        </div>
       </article>
     </main>
   );
