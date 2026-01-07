@@ -1,16 +1,11 @@
 "use client";
 import { useRef, useState } from "react";
-import { WAVE_TABLE } from "./wavetable";
+import { WAVE_TABLE } from "./components/wavetable";
 import Pad from "./components/Pad";
 
 const SWEEP_LENGTH = 2;
 const LOOKAHEAD = 25.0;
 const SCHEDULED_AHEAD_TIME = 0.1;
-
-type NoteQueueItem = {
-  note: number;
-  time: number;
-};
 
 const EMPTY_BAR: boolean[] = [false, false, false, false];
 
@@ -27,7 +22,6 @@ export default function Page() {
   const tempoRef = useRef(tempo);
   const currentNoteRef = useRef(0);
   const nextNoteTimeRef = useRef(0);
-  const notesInQueue = useRef<NoteQueueItem[]>([]);
   const timerIDRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attackRef = useRef(attackTime);
   const releaseRef = useRef(releaseTime);
@@ -66,9 +60,6 @@ export default function Page() {
   };
 
   const scheduleNote = (beatNumber: number, time: number) => {
-    // push the note in the queue, even if we are not playing.
-    notesInQueue.current.push({ note: beatNumber, time });
-
     if (sweepBar[beatNumber]) {
       playSweep(time);
     }
@@ -159,6 +150,7 @@ export default function Page() {
       return !prev;
     });
   };
+
   const playButtonLabel = isPlaying ? "STOP" : "START";
 
   return (

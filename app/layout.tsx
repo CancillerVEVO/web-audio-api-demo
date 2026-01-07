@@ -34,7 +34,10 @@ export default function RootLayout({
               <Link href={"/"}>Example 1</Link>
             </li>
             <li>
-              <Link href={"/examples"}>Example 2</Link>
+              <Link href={"/examples/2"}>Example 2</Link>
+            </li>
+            <li>
+              <Link href={"/examples/3"}>Example 3</Link>
             </li>
           </ul>
         </nav>
