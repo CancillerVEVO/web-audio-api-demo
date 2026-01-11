@@ -3,12 +3,12 @@ import { useEffect, useState } from "react";
 import { WAVE_TABLE } from "./components/wavetable";
 import Pad from "./components/Pad";
 import ControlKnob from "./components/control-knob";
-
-const SWEEP_LENGTH = 2;
-const LOOKAHEAD = 25.0;
-const SCHEDULED_AHEAD_TIME = 0.1;
-
-const EMPTY_BAR: boolean[] = [false, false, false, false];
+import {
+  EMPTY_BAR,
+  LOOKAHEAD,
+  SCHEDULED_AHEAD_TIME,
+  SWEEP_LENGTH,
+} from "./constants";
 
 export default function Page() {
   const [attackTime, setAttackTime] = useState<number>(0.2);
@@ -128,25 +128,29 @@ export default function Page() {
         {/**
          * BPM
          */}
-        <section>
+        <section className="flex justify-around items-baseline">
           <div>
-            <label htmlFor="bpm">BPM: {tempo}</label>
+            <label htmlFor="bpm">BPM: </label>
             <input
               name="bpm"
-              type="range"
+              type="number"
               min={60}
-              max={200}
-              step={1}
+              max={220}
               value={tempo}
               onChange={handleBPMChange}
+              className="border-s-black"
             />
           </div>
+
+          {/**Play Button */}
+          <button
+            className="aspect-3/2 bg-blue-400 rounded-full"
+            onClick={handlePlayButtonClick}
+          >
+            <p className="p-4">{playButtonLabel}</p>
+          </button>
         </section>
 
-        {/**Play Button */}
-        <div>
-          <button onClick={handlePlayButtonClick}>{playButtonLabel}</button>
-        </div>
         {/**
          * SWEEP CONTROLS
          */}
@@ -160,7 +164,9 @@ export default function Page() {
                 max={1}
                 step={0.1}
                 value={attackTime}
-                onChange={handleAttackChange}
+                onChange={(value) => {
+                  setAttackTime(value);
+                }}
               />
               <ControlKnob
                 label="Rel"
@@ -168,16 +174,16 @@ export default function Page() {
                 max={2}
                 step={0.1}
                 value={releaseTime}
-                onChange={handleReleaseChange}
+                onChange={(value) => setReleaseTime(value)}
               />
 
               <ControlKnob
                 label="Freq"
-                min={0}
+                min={10}
                 max={400}
-                step={10}
+                step={1}
                 value={frequency}
-                onChange={handleFrequencyChange}
+                onChange={(value) => setFrequency(value)}
               />
             </div>
 
