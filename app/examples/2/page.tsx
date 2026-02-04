@@ -17,6 +17,7 @@ export default function Page() {
   const [tempo, setTempo] = useState<number>(60);
   const [sweepBar, setSweepBar] = useState<boolean[]>(EMPTY_BAR);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [test, setTest] = useState(1);
 
   // event handlers
   const handleAttackChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
@@ -26,7 +27,7 @@ export default function Page() {
   };
 
   const handleReleaseChange = (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ): void => {
     const value = parseFloat(e.target.value);
 
@@ -40,7 +41,7 @@ export default function Page() {
   };
 
   const handleFrequencyChange = (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ): void => {
     const value = parseFloat(e.target.value);
 
@@ -77,7 +78,7 @@ export default function Page() {
       sweepEnv.gain.linearRampToValueAtTime(1, time + attackTime);
       sweepEnv.gain.linearRampToValueAtTime(
         0,
-        time + SWEEP_LENGTH - releaseTime
+        time + SWEEP_LENGTH - releaseTime,
       );
 
       osc.connect(sweepEnv).connect(audioCtx.destination);
@@ -184,6 +185,14 @@ export default function Page() {
                 step={1}
                 value={frequency}
                 onChange={(value) => setFrequency(value)}
+              />
+              <ControlKnob
+                label="percentage test"
+                min={1}
+                max={360}
+                step={1}
+                value={test}
+                onChange={(value) => setTest(value)}
               />
             </div>
 
