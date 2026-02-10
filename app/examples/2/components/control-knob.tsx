@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { MouseEventHandler, useEffect, useRef, useState } from "react";
 
 interface ControlKnobProps {
   label: string;
@@ -17,10 +17,14 @@ export default function ControlKnob({
   value,
   onChange,
 }: ControlKnobProps) {
+  const [editing, setEditing] = useState(false);
+
+  const startY = useRef(0);
+  const startValue = useRef(0);
   const dragging = useRef(false);
+  const knobRef = useRef<SVGSVGElement>(null);
 
   const r = 46;
-
   const x = r * Math.cos(Math.PI / 4);
   const y = r * Math.sin(Math.PI / 4);
 
@@ -41,13 +45,21 @@ export default function ControlKnob({
     return { dx, dy, largeArc };
   };
 
-  const onMouseDown = () => {
+  const onMouseDown = (e: React.MouseEvent) => {
     dragging.current = true;
+    startY.current = e.clientY;
+    startValue.current = value;
   };
 
   const onMouseMove = (e: MouseEvent) => {
     if (!dragging.current) return;
-    console.log("GLOBAL MOVE", e.clientX, e.clientY);
+
+    const deltaY = startY.current - e.clientY;
+    let next = startValue.current + deltaY * step;
+
+    next = Math.min(max, Math.max(min, next));
+
+    onChange(next);
   };
 
   const onMouseUp = () => {
@@ -72,8 +84,9 @@ export default function ControlKnob({
         width={100}
         height={100}
         viewBox="-50 -50 100 100"
-        className="cursor-pointer touch-none"
+        className="cursor-ns-resize touch-none"
         onMouseDown={onMouseDown}
+        ref={knobRef}
       >
         <path
           stroke="gray"
@@ -107,22 +120,39 @@ export default function ControlKnob({
           y2={pos.dy}
         />
       </svg>
+      <p className="text-sm opacity-70">{label}</p>
 
-      <p>{`${label}: ${value.toFixed(2)}`}</p>
-
-      <label>
-        change
-        <input
-          min={min}
-          max={max}
-          value={value}
-          step={1}
-          type="range"
-          onChange={(e) => {
-            onChange(Number(e.target.value));
-          }}
-        />
-      </label>
+      <div className="flex items-center gap-1">
+        {editing ? (
+          <input
+            type="number"
+            value={value}
+            min={min}
+            max={max}
+            step={step}
+            autoFocus
+            onChange={(e) => {
+              let v = Number(e.target.value);
+              v = Math.min(max, Math.max(min, v));
+              onChange(v);
+            }}
+            onBlur={() => setEditing(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setEditing(false);
+              if (e.key === "Escape") setEditing(false);
+            }}
+            className="w-16 text-center border rounded"
+          />
+        ) : (
+          <span
+            className="cursor-text select-none"
+            onDoubleClick={() => setEditing(true)}
+            title="Double click to edit"
+          >
+            {value.toFixed(2)}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
